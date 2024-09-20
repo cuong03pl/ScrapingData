@@ -6,17 +6,40 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 import time
 import requests
-def callAPI(name, price):
-            # URL của endpoint Strapi API
+def download_image(image_url, file_name):
+    """Download an image from a URL and save it locally."""
+    response = requests.get(image_url)
+    if response.status_code == 200:
+        with open(file_name, 'wb') as f:
+            f.write(response.content)
+        print(f"Image saved as {file_name}")
+    else:
+        print(f"Failed to download image from {image_url}. Status code: {response.status_code}")
+
+
+
+    strapi_url = 'http://localhost:1337/api/upload'
+
+    try:
+        with open(file_name, 'rb') as image_file:
+            files = {'files': image_file}
+            upload_response = requests.post(strapi_url, files=files)
+            upload_response.raise_for_status()
+            
+            print('Upload thành công:', upload_response.json())
+            return upload_response.json()[0]['id'] 
+    except Exception as err:
+        print(f"An error occurred while uploading the image: {err}")
+
+def callAPI(name, price, imgId):
             api_url = 'http://localhost:1337/api/products?populate=*' 
 
-            # Dữ liệu cần gửi
             data = { "data" : {
                  "name": name,
                 "description": "Mô tả sản phẩm",
                 "price": int(price),
                 "category": 4,  
-                "image": [25],
+                "image": [imgId],
                 "status": 1,
                 "discount": 10,
                 "details": "Chi tiết sản phẩm"
@@ -67,7 +90,18 @@ def get_amazon_product_details(url):
         
         print(f"Price: {price}")
 
-        callAPI(product_title, price)
+
+        image_element = WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.ID, "imgTagWrapperId"))
+        )
+        image_url = image_element.find_element(By.TAG_NAME, "img").get_attribute("src")
+        print(f"Image URL: {image_url}")
+
+        # Đặt tên file ảnh dựa trên tên sản phẩm
+        image_file_name = f"{product_title.replace(' ', '_')}.jpg"
+        imgId = download_image(image_url, image_file_name)
+
+        callAPI(product_title, price, imgId)
     except Exception as e:
         print(f"Error: Unable to retrieve product details from {url}. Exception: {e}")
     finally:
